@@ -21,12 +21,12 @@ pub mod Helper{
     #[derive(Debug,Clone)]
     pub struct CLI{
         pub dbg: bool,
-        pub files: HashSet<String>,
+        pub params: HashSet<String>,
         pub splice_files: Vec<FileSlice>,
         pub nested_gitignore: bool,
         pub graph: bool,
         pub conditions: Vec<String>,
-        pub condition_params: Vec<String>,
+        pub condition_params: HashMap<String,String>,
         pub local_commit_log: Option<PathBuf>,
         pub auto_repo_link: bool,
     }
@@ -43,7 +43,7 @@ pub mod Helper{
 
     impl CLI{
         pub fn new() -> Self{
-            Self {dbg: false ,files:HashSet::new(),splice_files:vec![],nested_gitignore:false,graph:false,conditions:vec![],local_commit_log:None,auto_repo_link: false,condition_params:vec![]}
+            Self {dbg: false ,params:HashSet::new(),splice_files:vec![],nested_gitignore:false,graph:false,conditions:vec![],local_commit_log:None,auto_repo_link: false,condition_params:HashMap::new()}
         }
 
         pub fn Parse_Args(&mut self){
@@ -85,11 +85,39 @@ pub mod Helper{
                 } else if i == "--auto" || i == "-a" || i == "--Auto" || i == "-A" {
                     self.auto_repo_link = true
                 } else if i.starts_with("--if") || i.starts_with("--IF"){
-                    self.conditions.push((&i[i.find("[").unwrap()+1..i.find("]").unwrap()]).to_string());
-                }  else if i.starts_with("--if_then") || i.starts_with("--IF_THEN"){
-                    self.condition_params.push((&i[i.find("[").unwrap()+1..i.find("]").unwrap()]).to_string());
+                    if let Some(start) = i.find('[') {
+                        if let Some(end) = i.find(']') {
+                            if end > start {
+                                self.conditions.push(i[start + 1..end].to_string());
+                            }
+                        }
+                    }
+                } else if i.starts_with("--if_then") || i.starts_with("--IF_THEN"){
+                    if let Some(cond_start) = i.find('[') {
+                        if let Some(cond_end) = i.find(']') {
+                            if cond_end > cond_start {
+                                let condition = i[cond_start + 1..cond_end].to_string();
+                                self.condition_params.insert("cond".to_string(), condition);
+                                
+                                if let Some(params_start) = i.find('(') {
+                                    if let Some(params_end) = i.find(')') {
+                                        if params_end > params_start {
+                                            let params_str = i[params_start + 1..params_end].to_string();
+                                            for pair in params_str.split_whitespace() {
+                                                if let Some(eq_pos) = pair.find('=') {
+                                                    let key = pair[..eq_pos].to_string();
+                                                    let value = pair[eq_pos + 1..].to_string();
+                                                    self.condition_params.insert(key, value);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }else{
-                    self.files.insert(i.to_string());
+                    self.params.insert(i.to_string());
                 }
            } 
 
@@ -112,6 +140,71 @@ pub mod Helper{
 
         }
 
+        pub fn process_flags_cond(flags:u8,param: &str) -> bool{
+            if flags & (1 << 0) != 0{
+                if !Path::new(param).exists(){
+                    return false;
+                }
+            }
+            
+            if flags & (1 << 1) != 0{
+                if Path::new(param).exists(){
+                    return false;
+                }
+            }
+
+            if flags & (1 << 2) != 0{
+                if !Path::new(param).is_file(){
+                    return false;
+                }
+            }
+
+            if flags & (1 << 3) != 0{
+                if !Path::new(param).is_dir(){
+                    return false;
+                }
+            }
+            if flags & (1 << 4) != 0{
+                if !Path::new(param).exists(){
+                    fs::create_dir_all(param).unwrap();
+                }
+            }
+
+            if flags & (1 << 5) != 0{
+                if f_meta.try_read().unwrap().is_none(){
+                    let _ = f_meta.try_write().unwrap().insert(fs::metadata(param).unwrap());
+                }else{
+                    let f2_meta = fs::metadata(param).unwrap();
+                    if let Some(x) = &*f_meta.try_read().unwrap(){
+                       if f2_meta.len() == x.len() && ((f2_meta.is_file() && x.is_file()) || (f2_meta.is_dir() && x.is_dir())) {
+                       } else{
+                            return false;
+                       }
+                    }
+
+                }
+            }
+            
+            if flags & (1 << 6) != 0{
+                if f_meta.try_read().unwrap().is_none(){
+                    let _ = f_meta.try_write().unwrap().insert(fs::metadata(param).unwrap());
+                }else{
+                    let f2_meta = fs::metadata(param).unwrap();
+                    if let Some(x) = &*f_meta.try_read().unwrap(){
+                       if f2_meta.len() == x.len() && ((f2_meta.is_file() && x.is_file()) || (f2_meta.is_dir() && x.is_dir())) {
+                            return false;
+                       }
+                    }
+
+                }
+            }
+        true
+
+        }
+
+
+        
+        
         pub fn process_flags(flags:u8,param: &str) {
             if flags & (1 << 0) != 0{
                 if !Path::new(param).exists(){

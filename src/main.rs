@@ -1,6 +1,6 @@
-use std::{fs::Metadata, process::exit};
+use std::{collections::HashSet, fs::Metadata, process::exit};
 
-use crate::helper::Helper::{CLI, f_meta, get_username, print_commit_history, process_flags};
+use crate::helper::Helper::{CLI, f_meta, get_username, print_commit_history, process_flags, process_flags_cond};
 
 mod helper;
 
@@ -10,6 +10,13 @@ fn main() {
     clargs.Parse_Args();
     if clargs.dbg{
         println!("{clargs:?}");
+    }
+
+    let mut Git_Params:HashSet<&String>;
+    if clargs.params.contains("."){
+        Git_Params = clargs.params.iter().filter(|x| !x.starts_with("-")).collect();
+    }else{
+        Git_Params = HashSet::new();
     }
 
     if clargs.graph{
@@ -37,8 +44,10 @@ fn main() {
         }
         if i.starts_with("-"){
         flags = 0;
-        let iterator = i.chars().skip(1).enumerate();
-            for (idx,j) in iterator{
+        *f_meta.try_write().unwrap() = None;
+
+        let iterator = i.chars().skip(1);
+            for j in iterator{
                 match j{
                     'E' => {flags |= 1 << 0;},
                     'N' => {flags |= 1 << 1;},
@@ -51,11 +60,35 @@ fn main() {
                 }
 
             }
-                
-        
         }
+    }
 
+    flags = 0;
+    for (i,v) in &clargs.condition_params{
+        if flags != 0{
+            if process_flags_cond(flags,i){
+               Git_Params.insert(v);
+            }
+        }
+        if i.starts_with("-"){
+        flags = 0;
+        *f_meta.try_write().unwrap() = None;
 
+        let iterator = i.chars().skip(1);
+            for j in iterator{
+                match j{
+                    'E' => {flags |= 1 << 0;},
+                    'N' => {flags |= 1 << 1;},
+                    'F' => {flags |= 1 << 2;},
+                    'D' => {flags |= 1 << 3;},
+                    'C' => {flags |= 1 << 4;},
+                    '!' => {flags |= 1 << 5;},
+                    '=' => {flags |= 1 << 6;},
+                    _ => {}
+                }
+
+            }
+        }
     }
 
 
