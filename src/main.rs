@@ -3,6 +3,7 @@ use std::{collections::HashSet, fs::{self, Metadata}, path::Path, process::{Comm
 use crate::helper::Helper::{CLI, f_meta, get_username, print_commit_history, process_flags, process_flags_cond};
 
 mod helper;
+mod render;
 
 fn main() {
     let mut clargs = CLI::new();

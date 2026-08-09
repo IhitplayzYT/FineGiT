@@ -135,7 +135,7 @@ pub mod Helper{
     
 
         pub fn print_commit_history() {
-
+            crate::render::Render::run_tui();
         }
 
         pub fn process_flags_cond(flags:u8,param: &str) -> bool{
