@@ -1,5 +1,5 @@
 pub mod Helper{
-    use std::{collections::{HashMap, HashSet}, fs::{self, Metadata}, ops::ControlFlow::Continue, path::{Path, PathBuf}, process::{Command, exit}};
+    use std::{collections::{HashMap, HashSet}, fs::{self, Metadata}, path::Path, process::{Command, exit}};
 
     use std::sync::RwLock;
     use std::sync::LazyLock;
@@ -13,7 +13,7 @@ pub mod Helper{
 
     #[derive(Debug,Clone)]
     pub struct FileSlice{
-        pub path : PathBuf,
+        pub path : String,
         pub slice_idx: (usize,usize)
     }
 
@@ -27,8 +27,8 @@ pub mod Helper{
         pub graph: bool,
         pub conditions: Vec<String>,
         pub condition_params: HashMap<String,String>,
-        pub local_commit_log: Option<PathBuf>,
         pub auto_repo_link: bool,
+        pub commit_msg: Option<String>
     }
 
     
@@ -43,18 +43,19 @@ pub mod Helper{
 
     impl CLI{
         pub fn new() -> Self{
-            Self {dbg: false ,params:HashSet::new(),splice_files:vec![],nested_gitignore:false,graph:false,conditions:vec![],local_commit_log:None,auto_repo_link: false,condition_params:HashMap::new()}
+            Self {dbg: false ,params:HashSet::new(),splice_files:vec![],nested_gitignore:false,graph:false,conditions:vec![],auto_repo_link: false,condition_params:HashMap::new(),commit_msg:None}
         }
 
         pub fn Parse_Args(&mut self){
             let args: Vec<String> = std::env::args().skip(1).collect();
+            
            for i in &args{
                 if i == "-d" || i == "--debug" || i == " --DEBUG" || i == "-D"{
                     self.dbg = true;
                 }else if i == "-h" || i == "--help" || i == " --HELP" || i == "-H"{
                     Help();
-                }else if i.contains("[") && i.contains("]"){
-                    let fpath = PathBuf::from(&i[..i.find("[").unwrap()]);
+                }else if (i.contains("[") && i.contains("]")) && (i.rfind("]").unwrap() == i.len() - 1){
+                    let fpath = i[..i.find("[").unwrap()].to_string();
                     let (mut lb,mut ub) = (0, 0);
                     for (idx,v) in (&i[i.find("[").unwrap()+1..i.find("]").unwrap()]).split("..").enumerate(){
                         if idx == 0{
@@ -76,12 +77,6 @@ pub mod Helper{
                     self.graph = true;
                 } else if i == "--nested" || i == "-n" || i == "-N" || i == "--Nested"{
                     self.nested_gitignore = true;
-                } else if i.starts_with("-loc"){
-                    if i.contains("="){
-                        self.local_commit_log = Some(PathBuf::from(&i[i.find("=").unwrap()+1..]));
-                    }else{
-                        self.local_commit_log = Some(PathBuf::from("COMMIT.md"));
-                    }
                 } else if i == "--auto" || i == "-a" || i == "--Auto" || i == "-A" {
                     self.auto_repo_link = true
                 } else if i.starts_with("--if") || i.starts_with("--IF"){
@@ -116,7 +111,10 @@ pub mod Helper{
                             }
                         }
                     }
-                }else{
+                }else if i.starts_with("--commit=") || i.starts_with("-c="){
+                    self.commit_msg = Some(i[i.find("=").unwrap()..].to_string());
+                }
+                else{
                     self.params.insert(i.to_string());
                 }
            } 
